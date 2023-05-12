@@ -43,7 +43,7 @@ def test_r_plus_with_sha():
     """
 
     author = "jack"
-    body = "@bors r+ {}".format(other_commit)
+    body = f"@bors r+ {other_commit}"
     commands = parse_issue_comment(author, body, commit, "bors")
 
     assert len(commands) == 1
@@ -169,7 +169,7 @@ def test_approve_specific_and_priority():
     """
 
     author = "jack"
-    body = "@bors r+ {} p=5".format(other_commit)
+    body = f"@bors r+ {other_commit} p=5"
     commands = parse_issue_comment(author, body, commit, "bors")
 
     assert len(commands) == 2

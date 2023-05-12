@@ -9,7 +9,7 @@ class Comment:
             if key in self.params:
                 setattr(self, key, value)
             else:
-                raise KeyError("unknown attribute: %s" % key)
+                raise KeyError(f"unknown attribute: {key}")
 
     def jsonify(self):
         out = {"type": self.__class__.__name__}
@@ -77,18 +77,14 @@ class BuildStarted(Comment):
     params = ["head_sha", "merge_sha"]
 
     def render(self):
-        return ":hourglass: Testing commit %s with merge %s..." % (
-            self.head_sha, self.merge_sha,
-        )
+        return f":hourglass: Testing commit {self.head_sha} with merge {self.merge_sha}..."
 
 
 class TryBuildStarted(Comment):
     params = ["head_sha", "merge_sha"]
 
     def render(self):
-        return ":hourglass: Trying commit %s with merge %s..." % (
-            self.head_sha, self.merge_sha,
-        )
+        return f":hourglass: Trying commit {self.head_sha} with merge {self.merge_sha}..."
 
 
 class BuildCompleted(Comment):
@@ -124,18 +120,14 @@ class BuildFailed(Comment):
     params = ["builder_url", "builder_name"]
 
     def render(self):
-        return ":broken_heart: Test failed - [%s](%s)" % (
-            self.builder_name, self.builder_url
-        )
+        return f":broken_heart: Test failed - [{self.builder_name}]({self.builder_url})"
 
 
 class TryBuildFailed(Comment):
     params = ["builder_url", "builder_name"]
 
     def render(self):
-        return ":broken_heart: Test failed - [%s](%s)" % (
-            self.builder_name, self.builder_url
-        )
+        return f":broken_heart: Test failed - [{self.builder_name}]({self.builder_url})"
 
 
 class TimedOut(Comment):

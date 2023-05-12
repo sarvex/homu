@@ -17,7 +17,7 @@ def github_set_ref(repo, ref, sha, *, force=False, auto_create=True, retry=1):
     except github3.models.GitHubError as e:
         if e.code == 422 and auto_create:
             try:
-                return repo.create_ref('refs/' + ref, sha)
+                return repo.create_ref(f'refs/{ref}', sha)
             except github3.models.GitHubError:
                 raise e
         elif e.code == 422 and retry > 0:
@@ -75,7 +75,7 @@ def logged_call(args):
     try:
         subprocess.check_call(args, stdout=subprocess.DEVNULL, stderr=None)
     except subprocess.CalledProcessError:
-        print('* Failed to execute command: {}'.format(args))
+        print(f'* Failed to execute command: {args}')
         raise
 
 
@@ -95,7 +95,7 @@ def retry_until(inner, fail, state):
         try:
             inner()
         except (github3.models.GitHubError, requests.exceptions.RequestException) as e:  # noqa
-            print('* Intermittent GitHub error: {}'.format(e), file=sys.stderr)
+            print(f'* Intermittent GitHub error: {e}', file=sys.stderr)
 
             err = e
             exc_info = sys.exc_info()
@@ -107,7 +107,7 @@ def retry_until(inner, fail, state):
             break
 
     if err:
-        print('* GitHub failure in {}'.format(state), file=sys.stderr)
+        print(f'* GitHub failure in {state}', file=sys.stderr)
         traceback.print_exception(*exc_info)
 
         fail(err)

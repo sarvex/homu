@@ -137,11 +137,7 @@ def hook_with_extra_is_in_hooks(word, hooks):
          ['validhookname', 'other'])
        #=> False
     """
-    for hook in hooks:
-        if word.startswith('{}='.format(hook)):
-            return True
-
-    return False
+    return any(word.startswith(f'{hook}=') for hook in hooks)
 
 
 def parse_issue_comment(username, body, sha, botname, hooks=[]):
@@ -159,14 +155,16 @@ def parse_issue_comment(username, body, sha, botname, hooks=[]):
            E.g. `['hook1', 'hook2', 'hook3']`
     """
 
-    botname_regex = re.compile(r'^.*(?=@' + botname + ')')
+    botname_regex = re.compile(f'^.*(?=@{botname})')
 
     # All of the 'words' after and including the botname
-    words = list(chain.from_iterable(
-                     re.findall(r'\S+', re.sub(botname_regex, '', x))
-                 for x
-                 in body.splitlines()
-                 if '@' + botname in x and not x.lstrip().startswith('>')))  # noqa
+    words = list(
+        chain.from_iterable(
+            re.findall(r'\S+', re.sub(botname_regex, '', x))
+            for x in body.splitlines()
+            if f'@{botname}' in x and not x.lstrip().startswith('>')
+        )
+    )
 
     commands = []
 
@@ -179,10 +177,10 @@ def parse_issue_comment(username, body, sha, botname, hooks=[]):
             # to signify that we did.
             continue
 
-        if word == '@' + botname:
+        if word == f'@{botname}':
             continue
 
-        if word == '@' + botname + ':':
+        if word == f'@{botname}:':
             continue
 
         if word == 'r+' or word.startswith('r='):
@@ -253,7 +251,7 @@ def parse_issue_comment(username, body, sha, botname, hooks=[]):
         elif word == 'clean':
             commands.append(IssueCommentCommand.clean())
 
-        elif (word == 'hello?' or word == 'ping'):
+        elif word in ['hello?', 'ping']:
             commands.append(IssueCommentCommand.ping())
 
         elif word.startswith('treeclosed='):

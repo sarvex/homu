@@ -6,15 +6,15 @@ RETRIES = 5
 
 def fetch_rust_team(repo_label, level):
     repo = repo_label.replace('-', '_')
-    url = RUST_TEAM_BASE + "permissions/bors." + repo + "." + level + ".json"
+    url = f"{RUST_TEAM_BASE}permissions/bors.{repo}.{level}.json"
     for retry in range(RETRIES):
         try:
             resp = requests.get(url)
             resp.raise_for_status()
             return resp.json()["github_ids"]
         except requests.exceptions.RequestException as e:
-            msg = "error while fetching " + url
-            msg += " (try " + str(retry) + "): " + str(e)
+            msg = f"error while fetching {url}"
+            msg += f" (try {str(retry)}): {str(e)}"
             print(msg)
             continue
     return []
@@ -64,15 +64,15 @@ def verify(username, user_id, repo_label, repo_cfg, state, auth, realtime,
 
     if authorized:
         return True
-    else:
-        if realtime:
-            reply = '@{}: :key: Insufficient privileges: '.format(username)
-            if auth == AuthState.REVIEWER:
-                if repo_cfg.get('auth_collaborators', False):
-                    reply += 'Collaborator required'
-                else:
-                    reply += 'Not in reviewers'
-            elif auth == AuthState.TRY:
-                reply += 'not in try users'
-            state.add_comment(reply)
-        return False
+    if realtime:
+        reply = f'@{username}: :key: Insufficient privileges: '
+        if auth == AuthState.REVIEWER:
+            reply += (
+                'Collaborator required'
+                if repo_cfg.get('auth_collaborators', False)
+                else 'Not in reviewers'
+            )
+        elif auth == AuthState.TRY:
+            reply += 'not in try users'
+        state.add_comment(reply)
+    return False

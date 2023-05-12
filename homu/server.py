@@ -85,17 +85,15 @@ def index():
 @get('/results/<repo_label:path>/<pull:int>')
 def result(repo_label, pull):
     if repo_label not in g.states:
-        abort(404, 'No such repository: {}'.format(repo_label))
+        abort(404, f'No such repository: {repo_label}')
     states = [state for state in g.states[repo_label].values()
               if state.num == pull]
-    if len(states) == 0:
-        abort(404, 'No build results for pull request {}'.format(pull))
+    if not states:
+        abort(404, f'No build results for pull request {pull}')
 
     state = states[0]
     builders = []
-    repo_url = 'https://github.com/{}/{}'.format(
-        g.cfg['repo'][repo_label]['owner'],
-        g.cfg['repo'][repo_label]['name'])
+    repo_url = f"https://github.com/{g.cfg['repo'][repo_label]['owner']}/{g.cfg['repo'][repo_label]['name']}"
     for (builder, data) in state.build_res.items():
         result = "pending"
         if data['res'] is not None:
@@ -122,7 +120,7 @@ def queue(repo_label):
 
     logger = g.logger.getChild('queue')
 
-    lazy_debug(logger, lambda: 'repo_label: {}'.format(repo_label))
+    lazy_debug(logger, lambda: f'repo_label: {repo_label}')
 
     single_repo_closed = None
     treeclosed_src = None
@@ -136,16 +134,14 @@ def queue(repo_label):
         if repo_label in g.repos and g.repos[repo_label].treeclosed >= 0:
             single_repo_closed = g.repos[repo_label].treeclosed
             treeclosed_src = g.repos[repo_label].treeclosed_src
-        repo_url = 'https://github.com/{}/{}'.format(
-            g.cfg['repo'][repo_label]['owner'],
-            g.cfg['repo'][repo_label]['name'])
+        repo_url = f"https://github.com/{g.cfg['repo'][repo_label]['owner']}/{g.cfg['repo'][repo_label]['name']}"
 
     states = []
     for label in labels:
         try:
             states += g.states[label].values()
         except KeyError:
-            abort(404, 'No such repository: {}'.format(label))
+            abort(404, f'No such repository: {label}')
 
     prechecked_prs = set()
     if request.query.get('prs'):
@@ -161,27 +157,29 @@ def queue(repo_label):
         if state.try_:
             status_ext += ' (try)'
 
-        rows.append({
-            'status': state.get_status(),
-            'status_ext': status_ext,
-            'priority': state.priority,
-            'rollup': ROLLUP_STR.get(state.rollup, ''),
-            'prechecked': str(state.num) in prechecked_prs,
-            'url': 'https://github.com/{}/{}/pull/{}'.format(state.owner,
-                                                             state.name,
-                                                             state.num),
-            'num': state.num,
-            'approved_by': state.approved_by,
-            'title': state.title,
-            'head_ref': state.head_ref,
-            'mergeable': ('yes' if state.mergeable is True else
-                          'no' if state.mergeable is False else ''),
-            'assignee': state.assignee,
-            'repo_label': state.repo_label,
-            'repo_url': 'https://github.com/{}/{}'.format(state.owner,
-                                                          state.name),
-            'greyed': "treeclosed" if treeclosed else "",
-        })
+        rows.append(
+            {
+                'status': state.get_status(),
+                'status_ext': status_ext,
+                'priority': state.priority,
+                'rollup': ROLLUP_STR.get(state.rollup, ''),
+                'prechecked': str(state.num) in prechecked_prs,
+                'url': f'https://github.com/{state.owner}/{state.name}/pull/{state.num}',
+                'num': state.num,
+                'approved_by': state.approved_by,
+                'title': state.title,
+                'head_ref': state.head_ref,
+                'mergeable': 'yes'
+                if state.mergeable is True
+                else 'no'
+                if state.mergeable is False
+                else '',
+                'assignee': state.assignee,
+                'repo_label': state.repo_label,
+                'repo_url': f'https://github.com/{state.owner}/{state.name}',
+                'greyed': "treeclosed" if treeclosed else "",
+            }
+        )
 
     return g.tpls['queue'].render(
         repo_url=repo_url,
@@ -193,8 +191,9 @@ def queue(repo_label):
         total=len(pull_states),
         approved=len([x for x in pull_states if x.approved_by]),
         rolled_up=len([x for x in pull_states if x.rollup > 0]),
-        failed=len([x for x in pull_states if x.status == 'failure' or
-                   x.status == 'error']),
+        failed=len(
+            [x for x in pull_states if x.status in ['failure', 'error']]
+        ),
         multiple=multiple,
     )
 
@@ -206,12 +205,9 @@ def retry_log(repo_label):
 
     logger = g.logger.getChild('retry_log')
 
-    lazy_debug(logger, lambda: 'repo_label: {}'.format(repo_label))
+    lazy_debug(logger, lambda: f'repo_label: {repo_label}')
 
-    repo_url = 'https://github.com/{}/{}'.format(
-        g.cfg['repo'][repo_label]['owner'],
-        g.cfg['repo'][repo_label]['name'],
-    )
+    repo_url = f"https://github.com/{g.cfg['repo'][repo_label]['owner']}/{g.cfg['repo'][repo_label]['name']}"
 
     db_query(
         g.db,
@@ -242,7 +238,7 @@ def callback():
     code = request.query.code
     state = json.loads(request.query.state)
 
-    lazy_debug(logger, lambda: 'state: {}'.format(state))
+    lazy_debug(logger, lambda: f'state: {state}')
     oauth_url = 'https://github.com/login/oauth/access_token'
 
     try:
@@ -254,10 +250,7 @@ def callback():
     except Exception as ex:
         logger.warn('/callback encountered an error '
                     'during github oauth callback')
-        lazy_debug(
-            logger,
-            lambda ex=ex: 'github oauth callback err: {}'.format(ex),
-        )
+        lazy_debug(logger, lambda ex=ex: f'github oauth callback err: {ex}')
         abort(502, 'Bad Gateway')
 
     args = urllib.parse.parse_qs(res.text)
@@ -283,12 +276,11 @@ def rollup(user_gh, state, repo_label, repo_cfg, repo):
         return 'You must have a fork of rust-lang/rust named rust under your user account.'  # noqa
     base_repo = user_gh.repository(repo.owner.login, repo.name)
 
-    nums = state.get('nums', [])
-    if nums:
+    if nums := state.get('nums', []):
         try:
             rollup_states = [g.states[repo_label][num] for num in nums]
         except KeyError as e:
-            return 'Invalid PR number: {}'.format(e.args[0])
+            return f'Invalid PR number: {e.args[0]}'
     else:
         rollup_states = [x for x in g.states[repo_label].values() if x.rollup]
     rollup_states = [x for x in rollup_states if x.approved_by]
@@ -299,16 +291,11 @@ def rollup(user_gh, state, repo_label, repo_cfg, repo):
 
     base_ref = rollup_states[0].base_ref
 
-    base_sha = repo.ref('heads/' + base_ref).object.sha
+    base_sha = repo.ref(f'heads/{base_ref}').object.sha
     branch_name = 'rollup-' + ''.join(
         random.choice(string.digits + string.ascii_lowercase) for _ in range(7)
     )
-    utils.github_set_ref(
-        user_repo,
-        'heads/' + branch_name,
-        base_sha,
-        force=True,
-    )
+    utils.github_set_ref(user_repo, f'heads/{branch_name}', base_sha, force=True)
 
     successes = []
     failures = []
@@ -321,13 +308,7 @@ def rollup(user_gh, state, repo_label, repo_cfg, repo):
         state.body = suppress_pings(state.body or "")
         state.body = suppress_ignore_block(state.body)
 
-        merge_msg = 'Rollup merge of #{} - {}, r={}\n\n{}\n\n{}'.format(
-            state.num,
-            state.head_ref,
-            state.approved_by,
-            state.title,
-            state.body,
-        )
+        merge_msg = f'Rollup merge of #{state.num} - {state.head_ref}, r={state.approved_by}\n\n{state.title}\n\n{state.body}'
 
         try:
             user_repo.merge(branch_name, state.head_sha, merge_msg)
@@ -339,14 +320,14 @@ def rollup(user_gh, state, repo_label, repo_cfg, repo):
         else:
             successes.append(state)
 
-    title = 'Rollup of {} pull requests'.format(len(successes))
+    title = f'Rollup of {len(successes)} pull requests'
 
     body = 'Successful merges:\n\n'
     for x in successes:
-        body += ' - #{} ({})\n'.format(x.num, x.title)
+        body += f' - #{x.num} ({x.title})\n'
     body += '\nFailed merges:\n\n'
     for x in failures:
-        body += ' - #{} ({})\n'.format(x.num, x.title)
+        body += f' - #{x.num} ({x.title})\n'
     body += '\nr? @ghost\n@rustbot modify labels: rollup'
 
     # Set web.base_url in cfg to enable
@@ -357,17 +338,17 @@ def rollup(user_gh, state, repo_label, repo_cfg, repo):
 
     if base_url:
         pr_list = ','.join(str(x.num) for x in successes)
-        link = '{}/queue/{}?prs={}'.format(base_url, repo_label, pr_list)
+        link = f'{base_url}/queue/{repo_label}?prs={pr_list}'
         body += '\n'
         body += IGNORE_BLOCK_START
-        body += '\n[Create a similar rollup]({})\n'.format(link)
+        body += f'\n[Create a similar rollup]({link})\n'
         body += IGNORE_BLOCK_END
 
     try:
         pull = base_repo.create_pull(
             title,
             state.base_ref,
-            user_repo.owner.login + ':' + branch_name,
+            f'{user_repo.owner.login}:{branch_name}',
             body,
         )
     except github3.models.GitHubError as e:
@@ -505,7 +486,7 @@ def github():
                 def inner():
                     utils.github_set_ref(
                         state.get_repo(),
-                        'heads/' + state.base_ref,
+                        f'heads/{state.base_ref}',
                         state.merge_sha,
                         force=True,
                     )
@@ -631,8 +612,14 @@ def github():
             if row['name'] == state.base_ref:
                 return 'OK'
 
-        report_build_res(info['state'] == 'success', info['target_url'],
-                         'status-' + status_name, state, logger, repo_cfg)
+        report_build_res(
+            info['state'] == 'success',
+            info['target_url'],
+            f'status-{status_name}',
+            state,
+            logger,
+            repo_cfg,
+        )
 
     elif event_type == 'check_run':
         try:
@@ -664,8 +651,10 @@ def github():
         report_build_res(
             info['check_run']['conclusion'] == 'success',
             info['check_run']['details_url'],
-            'checks-' + checks_name,
-            state, logger, repo_cfg,
+            f'checks-{checks_name}',
+            state,
+            logger,
+            repo_cfg,
         )
 
     return 'OK'
@@ -700,9 +689,13 @@ def report_build_res(succ, url, builder, state, logger, repo_cfg):
                     utils.github_set_ref(state.get_repo(), 'heads/' +
                                          state.base_ref, state.merge_sha)
                     if state.test_on_fork is not None:
-                        utils.github_set_ref(state.get_test_on_fork_repo(),
-                                             'heads/' + state.base_ref,
-                                             state.merge_sha, force=True)
+                        utils.github_set_ref(
+                            state.get_test_on_fork_repo(),
+                            f'heads/{state.base_ref}',
+                            state.merge_sha,
+                            force=True,
+                        )
+
                 try:
                     try:
                         set_ref()
@@ -725,7 +718,7 @@ def report_build_res(succ, url, builder, state, logger, repo_cfg):
                                                state.head_sha, 'error', url,
                                                desc, context='homu')
 
-                    state.add_comment(':eyes: ' + desc)
+                    state.add_comment(f':eyes: {desc}')
             else:
                 state.add_comment(comments.TryBuildCompleted(
                     builders={k: v["url"] for k, v in state.build_res.items()},
@@ -766,7 +759,7 @@ def buildbot():
     for row in json.loads(request.forms.packets):
         if row['event'] == 'buildFinished':
             info = row['payload']['build']
-            lazy_debug(logger, lambda: 'info: {}'.format(info))
+            lazy_debug(logger, lambda: f'info: {info}')
             props = dict(x[:2] for x in info['properties'])
 
             if 'retry' in info['text']:
@@ -778,15 +771,19 @@ def buildbot():
             try:
                 state, repo_label = find_state(props['revision'])
             except ValueError:
-                lazy_debug(logger,
-                           lambda: 'Invalid commit ID from Buildbot: {}'.format(props['revision']))  # noqa
+                lazy_debug(
+                    logger,
+                    lambda: f"Invalid commit ID from Buildbot: {props['revision']}",
+                )
                 continue
 
-            lazy_debug(logger, lambda: 'state: {}, {}'.format(state, state.build_res_summary()))  # noqa
+            lazy_debug(logger, lambda: f'state: {state}, {state.build_res_summary()}')
 
             if info['builderName'] not in state.build_res:
-                lazy_debug(logger,
-                           lambda: 'Invalid builder from Buildbot: {}'.format(info['builderName']))  # noqa
+                lazy_debug(
+                    logger,
+                    lambda: f"Invalid builder from Buildbot: {info['builderName']}",
+                )
                 continue
 
             repo_cfg = g.repo_cfgs[repo_label]
@@ -796,38 +793,27 @@ def buildbot():
 
             build_succ = 'successful' in info['text'] or info['results'] == 0
 
-            url = '{}/builders/{}/builds/{}'.format(
-                repo_cfg['buildbot']['url'],
-                info['builderName'],
-                props['buildnumber'],
-            )
+            url = f"{repo_cfg['buildbot']['url']}/builders/{info['builderName']}/builds/{props['buildnumber']}"
 
             if 'interrupted' in info['text']:
-                step_name = ''
-                for step in reversed(info['steps']):
-                    if 'interrupted' in step.get('text', []):
-                        step_name = step['name']
-                        break
-
-                if step_name:
+                if step_name := next(
+                    (
+                        step['name']
+                        for step in reversed(info['steps'])
+                        if 'interrupted' in step.get('text', [])
+                    ),
+                    '',
+                ):
                     try:
-                        url = ('{}/builders/{}/builds/{}/steps/{}/logs/interrupt'  # noqa
-                               ).format(repo_cfg['buildbot']['url'],
-                                        info['builderName'],
-                                        props['buildnumber'],
-                                        step_name,)
+                        url = f"{repo_cfg['buildbot']['url']}/builders/{info['builderName']}/builds/{props['buildnumber']}/steps/{step_name}/logs/interrupt"
                         res = requests.get(url)
                     except Exception as ex:
                         logger.warn('/buildbot encountered an error during '
                                     'github logs request')
-                        lazy_debug(
-                            logger,
-                            lambda ex=ex: 'buildbot logs err: {}'.format(ex),
-                        )
+                        lazy_debug(logger, lambda ex=ex: f'buildbot logs err: {ex}')
                         abort(502, 'Bad Gateway')
 
-                    mat = INTERRUPTED_BY_HOMU_RE.search(res.text)
-                    if mat:
+                    if mat := INTERRUPTED_BY_HOMU_RE.search(res.text):
                         interrupt_token = mat.group(1)
                         if getattr(state, 'interrupt_token',
                                    '') != interrupt_token:
@@ -858,7 +844,7 @@ def buildbot():
 
         elif row['event'] == 'buildStarted':
             info = row['payload']['build']
-            lazy_debug(logger, lambda: 'info: {}'.format(info))
+            lazy_debug(logger, lambda: f'info: {info}')
             props = dict(x[:2] for x in info['properties'])
 
             if not props['revision']:
@@ -875,11 +861,7 @@ def buildbot():
                     if request.forms.secret != repo_cfg['buildbot']['secret']:
                         abort(400, 'Invalid secret')
 
-                    url = '{}/builders/{}/builds/{}'.format(
-                        repo_cfg['buildbot']['url'],
-                        info['builderName'],
-                        props['buildnumber'],
-                    )
+                    url = f"{repo_cfg['buildbot']['url']}/builders/{info['builderName']}/builds/{props['buildnumber']}"
 
                     state.set_build_res(info['builderName'], None, url)
 
@@ -911,7 +893,7 @@ def synch(user_gh, state, repo_label, repo_cfg, repo):
                                      g.mergeable_que, g.my_username,
                                      g.repo_labels]).start()
 
-    return 'Synchronizing {}...'.format(repo_label)
+    return f'Synchronizing {repo_label}...'
 
 
 def synch_all():
@@ -1013,10 +995,10 @@ def redirect_to_canonical_host():
 
     # Handle path changes
     for prefix in g.cfg["web"].get("remove_path_prefixes", []):
-        if redirect_url.path.startswith("/" + prefix + "/"):
+        if redirect_url.path.startswith(f"/{prefix}/"):
             new_path = redirect_url.path[len(prefix)+1:]
             redirect_url = redirect_url._replace(path=new_path)
-        elif redirect_url.path == "/" + prefix:
+        elif redirect_url.path == f"/{prefix}":
             redirect_url = redirect_url._replace(path="/")
 
     if request_url != redirect_url:
@@ -1030,8 +1012,7 @@ def start(cfg, states, queue_handler, repo_cfgs, repos, logger,
         autoescape=True,
     )
     env.globals["announcement"] = cfg["web"].get("announcement")
-    tpls = {}
-    tpls['index'] = env.get_template('index.html')
+    tpls = {'index': env.get_template('index.html')}
     tpls['queue'] = env.get_template('queue.html')
     tpls['build_res'] = env.get_template('build_res.html')
     tpls['retry_log'] = env.get_template('retry_log.html')

@@ -107,8 +107,7 @@ class Repository:
             'SELECT treeclosed, treeclosed_src FROM repos WHERE repo = ?',
             [repo_label]
         )
-        row = db.fetchone()
-        if row:
+        if row := db.fetchone():
             self.treeclosed = row[0]
             self.treeclosed_src = row[1]
         else:
@@ -257,9 +256,8 @@ class PullReqState:
             )
 
     def get_status(self):
-        if self.status == '' and self.approved_by:
-            if self.mergeable is not False:
-                return 'approved'
+        if self.status == '' and self.approved_by and self.mergeable is not False:
+            return 'approved'
         return self.status
 
     def set_mergeable(self, mergeable, *, cause=None, que=True):
@@ -298,7 +296,7 @@ class PullReqState:
 
     def set_build_res(self, builder, res, url):
         if builder not in self.build_res:
-            raise Exception('Invalid builder: {}'.format(builder))
+            raise Exception(f'Invalid builder: {builder}')
 
         self.build_res[builder] = {
             'res': res,
@@ -318,8 +316,9 @@ class PullReqState:
             ])
 
     def build_res_summary(self):
-        return ', '.join('{}: {}'.format(builder, data['res'])
-                         for builder, data in self.build_res.items())
+        return ', '.join(
+            f"{builder}: {data['res']}" for builder, data in self.build_res.items()
+        )
 
     def get_repo(self):
         repo = self.repos[self.repo_label].gh
@@ -416,7 +415,7 @@ class PullReqState:
         self.timeout_timer = timer
 
     def timed_out(self):
-        print('* Test timed out: {}'.format(self))
+        print(f'* Test timed out: {self}')
 
         self.merge_sha = ''
         self.save()
